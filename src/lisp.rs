@@ -8,6 +8,8 @@ enum TokenTag {
     IN,
     EQUALS,
     VAR,
+    OTHER,
+    NUM,
 }
 
 impl TokenTag {
@@ -19,6 +21,8 @@ impl TokenTag {
             TokenTag::IN => 259,
             TokenTag::EQUALS => 260,
             TokenTag::VAR => 261,
+            TokenTag::OTHER => 262,
+            TokenTag::NUM => 263,
         }
     }
 }
@@ -145,17 +149,16 @@ trait Expr {
     fn eval(&self) -> Box<Value>;
 }
 
-struct Lexer<'a> {
+struct Lexer {
     reserved: HashMap<String, Arc<Box<dyn Token>>>,
     rule_content: String,
     chars: Vec<char>,
     cur_step: i32,
-    // current readed char
-    peek: Option<&'a char>,
+    peek: Option<char>,
 }
 
-impl<'a> Lexer<'a> {
-    fn create(content: String) -> Lexer<'a> {
+impl Lexer {
+    fn create(content: String) -> Lexer {
         let mut reserved: HashMap<String, Arc<Box<dyn Token>>> = HashMap::new();
         let and_ops = OpType::create_with_token(TokenTag::AND, "AND".to_string());
         let or_ops = OpType::create_with_token(TokenTag::OR, "OR".to_string());
@@ -167,21 +170,162 @@ impl<'a> Lexer<'a> {
         reserved.insert(mod_ops.lexeme(), Arc::new(mod_ops));
         reserved.insert(in_ops.lexeme(), Arc::new(in_ops));
         reserved.insert(eq_ops.lexeme(), Arc::new(eq_ops));
+        let chars: Vec<char> = content.chars().collect();
         Lexer {
             reserved: reserved,
-            chars: content.chars().collect(),
             rule_content: content,
             cur_step: -1,
             peek: None,
+            chars: chars,
         }
     }
 
-    fn read_next(&'a mut self) {
-        self.cur_step += 1;
-        self.peek = self.chars.get(self.cur_step as usize);
+    fn read(step: &mut i32, peek: &mut Option<char>, c: &Vec<char>) -> Result<(), String> {
+        *step += 1;
+        match c.get(*step as usize) {
+            Some(i) => {
+                peek.replace(i.clone());
+            }
+            None => {
+                return Err("Has read to the end".to_string());
+            }
+        }
+        Ok(())
     }
 
-    fn read_next(&mut self, c: char) -> bool {
-        false
+    fn read_next(&mut self, c: char) -> Result<bool, String> {
+        Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
+        // when return true, will go to next char
+        // so set this char to ' '
+        if self.peek == Some(c) {
+            self.peek = Some(' ');
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /**
+     * Skip all the blank chars
+     */
+    fn skip_blank_and_read(
+        step: &mut i32,
+        peek: &mut Option<char>,
+        chars: &Vec<char>,
+    ) -> Result<(), String> {
+        loop {
+            Self::read(step, peek, chars)?;
+            let peek = peek.unwrap_or(' ');
+            if peek == ' ' || peek == '\t' {
+                continue;
+            } else {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn scan(&mut self) -> Result<Box<dyn Token>, String> {
+        Self::skip_blank_and_read(&mut self.cur_step, &mut self.peek, &self.chars)?;
+        // 操作符Token匹配
+        match self.peek {
+            Some('I') => {
+                if self.read_next('N')? {
+                    return Ok(OpType::create_with_token(TokenTag::IN, "IN".to_string()));
+                } else {
+                    return Ok(Other::create_with_token_and_val(
+                        TokenTag::OTHER,
+                        self.peek.unwrap_or(' '),
+                    ));
+                }
+            }
+            Some('M') => {
+                if self.read_next('O')? && self.read_next('D')? {
+                    return Ok(OpType::create_with_token(TokenTag::MOD, "MOD".to_string()));
+                } else {
+                    return Ok(Other::create_with_token_and_val(
+                        TokenTag::OTHER,
+                        self.peek.unwrap_or(' '),
+                    ));
+                }
+            }
+            Some('A') => {
+                if self.read_next('N')? && self.read_next('D')? {
+                    return Ok(OpType::create_with_token(TokenTag::MOD, "AND".to_string()));
+                } else {
+                    return Ok(Other::create_with_token_and_val(
+                        TokenTag::OTHER,
+                        self.peek.unwrap_or(' '),
+                    ));
+                }
+            }
+            Some('O') => {
+                if self.read_next('R')? {
+                    return Ok(OpType::create_with_token(TokenTag::IN, "OR".to_string()));
+                } else {
+                    return Ok(Other::create_with_token_and_val(
+                        TokenTag::OTHER,
+                        self.peek.unwrap_or(' '),
+                    ));
+                }
+            }
+            Some('E') => {
+                if self.read_next('Q')?
+                    && self.read_next('U')?
+                    && self.read_next('A')?
+                    && self.read_next('L')?
+                {
+                    return Ok(OpType::create_with_token(TokenTag::MOD, "AND".to_string()));
+                } else {
+                    return Ok(Other::create_with_token_and_val(
+                        TokenTag::OTHER,
+                        self.peek.unwrap_or(' '),
+                    ));
+                }
+            }
+            _ => {}
+        }
+        // Numberic Token analyze
+        if self.peek.unwrap_or(' ').is_numeric() {
+            let mut v = 0;
+            loop {
+                v = 10 * v + self.peek.unwrap().to_digit(10 as u32).unwrap();
+                Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
+                if !self.peek.unwrap_or(' ').is_numeric() {
+                    break;
+                }
+            }
+            return Ok(Num::create_with_token_and_val(
+                TokenTag::NUM,
+                self.peek.unwrap().to_string(),
+            ));
+        }
+        // Var Token analyze
+        if self.peek.unwrap_or(' ') == '$' && self.read_next('{')? {
+            let mut id = String::new();
+            loop {
+                Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
+                let peek_num = self.peek.unwrap_or(' ');
+                if self.peek.unwrap_or(' ').is_numeric()
+                    || (peek_num >= 'a' && peek_num <= 'z')
+                    || (peek_num >= 'A' && peek_num <= 'Z')
+                {
+                    id.push(peek_num);
+                    break;
+                } else if peek_num == '}' {
+                    return Ok(Var::create_with_token_and_val(TokenTag::VAR, id));
+                } else {
+                    return Err(format!(
+                            "Illegal arg format for id, id should only contains a-zA-Z0-9, char index:{}",
+                            self.cur_step
+                        ));
+                }
+            }
+            return Ok(Num::create_with_token_and_val(
+                TokenTag::NUM,
+                self.peek.unwrap().to_string(),
+            ));
+        }
+        Ok(Other::create_with_token_and_val(TokenTag::OTHER, self.peek.unwrap()));
     }
 }
