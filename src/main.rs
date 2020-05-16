@@ -1,4 +1,4 @@
-mod lisp;
+mod ast;
 
 fn main() {
     println!("Hello, world!");

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-
-enum TokenTag {
+#[allow(dead_code)]
+pub enum TokenTag {
     AND,
     OR,
     MOD,
@@ -13,6 +13,7 @@ enum TokenTag {
 }
 
 impl TokenTag {
+    #[allow(dead_code)]
     fn value(&self) -> i32 {
         match *self {
             TokenTag::AND => 256,
@@ -38,6 +39,7 @@ struct OpType {
 }
 
 impl OpType {
+    #[allow(dead_code)]
     fn create_with_token(token_tag: TokenTag, lexeme: String) -> Box<dyn Token> {
         Box::new(OpType {
             tag: token_tag,
@@ -61,6 +63,7 @@ struct Var {
 }
 
 impl Var {
+    #[allow(dead_code)]
     fn create_with_token_and_val(token_tag: TokenTag, s: String) -> Box<dyn Token> {
         Box::new(Var {
             s: s,
@@ -78,16 +81,18 @@ impl Token for Var {
     }
 }
 
+#[allow(dead_code)]
 struct Num {
     token_tag: TokenTag,
     val: i64,
     lexeme: String,
 }
 impl Num {
+    #[allow(dead_code)]
     fn create_with_token_and_val(token_tag: TokenTag, lexeme: String) -> Box<dyn Token> {
         Box::new(Num {
             token_tag: token_tag,
-            val: lexeme.parse::<i64>().map_or_else(|e| -1 as i64, |v| v),
+            val: lexeme.parse::<i64>().map_or_else(|_e| -1 as i64, |v| v),
             lexeme: lexeme,
         })
     }
@@ -97,8 +102,9 @@ impl Token for Num {
     fn token_tag(&self) -> &TokenTag {
         return &self.token_tag;
     }
+    #[allow(dead_code)]
     fn lexeme(&self) -> String {
-        return self.lexeme().clone();
+        return self.lexeme.clone();
     }
 }
 
@@ -108,6 +114,7 @@ struct Str {
 }
 
 impl Str {
+    #[allow(dead_code)]
     fn create_with_token_and_val(token_tag: TokenTag, s: String) -> Box<dyn Token> {
         Box::new(Str {
             token_tag: token_tag,
@@ -131,14 +138,24 @@ struct Other {
 }
 
 impl Other {
+    #[allow(dead_code)]
     fn create_with_token_and_val(token_tag: TokenTag, s: char) -> Box<dyn Token> {
-        Box::new(Str {
+        Box::new(Other {
             token_tag: token_tag,
-            s: s.to_string(),
+            lexeme: s.to_string(),
         })
     }
 }
+impl Token for Other {
+    fn token_tag(&self) -> &TokenTag {
+        return &self.token_tag;
+    }
+    fn lexeme(&self) -> String {
+        return self.lexeme.clone();
+    }
+}
 
+#[allow(dead_code)]
 enum Value {
     INT(i64),
     BOOL(bool),
@@ -149,6 +166,7 @@ trait Expr {
     fn eval(&self) -> Box<Value>;
 }
 
+#[allow(dead_code)]
 struct Lexer {
     reserved: HashMap<String, Arc<Box<dyn Token>>>,
     rule_content: String,
@@ -158,6 +176,7 @@ struct Lexer {
 }
 
 impl Lexer {
+    #[allow(dead_code)]
     fn create(content: String) -> Lexer {
         let mut reserved: HashMap<String, Arc<Box<dyn Token>>> = HashMap::new();
         let and_ops = OpType::create_with_token(TokenTag::AND, "AND".to_string());
@@ -180,6 +199,7 @@ impl Lexer {
         }
     }
 
+    #[allow(dead_code)]
     fn read(step: &mut i32, peek: &mut Option<char>, c: &Vec<char>) -> Result<(), String> {
         *step += 1;
         match c.get(*step as usize) {
@@ -193,6 +213,7 @@ impl Lexer {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn read_next(&mut self, c: char) -> Result<bool, String> {
         Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
         // when return true, will go to next char
@@ -208,6 +229,7 @@ impl Lexer {
     /**
      * Skip all the blank chars
      */
+    #[allow(dead_code)]
     fn skip_blank_and_read(
         step: &mut i32,
         peek: &mut Option<char>,
@@ -215,7 +237,7 @@ impl Lexer {
     ) -> Result<(), String> {
         loop {
             Self::read(step, peek, chars)?;
-            let peek = peek.unwrap_or(' ');
+            let peek = peek.as_ref().unwrap_or(&' ').clone();
             if peek == ' ' || peek == '\t' {
                 continue;
             } else {
@@ -225,6 +247,7 @@ impl Lexer {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn scan(&mut self) -> Result<Box<dyn Token>, String> {
         Self::skip_blank_and_read(&mut self.cur_step, &mut self.peek, &self.chars)?;
         // 操作符Token匹配
@@ -235,7 +258,7 @@ impl Lexer {
                 } else {
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
-                        self.peek.unwrap_or(' '),
+                        self.peek.as_ref().unwrap_or(&' ').clone(),
                     ));
                 }
             }
@@ -245,7 +268,7 @@ impl Lexer {
                 } else {
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
-                        self.peek.unwrap_or(' '),
+                        self.peek.as_ref().unwrap_or(&' ').clone(),
                     ));
                 }
             }
@@ -255,7 +278,7 @@ impl Lexer {
                 } else {
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
-                        self.peek.unwrap_or(' '),
+                        self.peek.as_ref().unwrap_or(&' ').clone(),
                     ));
                 }
             }
@@ -265,7 +288,7 @@ impl Lexer {
                 } else {
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
-                        self.peek.unwrap_or(' '),
+                        self.peek.as_ref().unwrap_or(&' ').clone(),
                     ));
                 }
             }
@@ -279,19 +302,19 @@ impl Lexer {
                 } else {
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
-                        self.peek.unwrap_or(' '),
+                        self.peek.as_ref().unwrap_or(&' ').clone(),
                     ));
                 }
             }
             _ => {}
         }
         // Numberic Token analyze
-        if self.peek.unwrap_or(' ').is_numeric() {
+        if self.peek.as_ref().unwrap_or(&' ').clone().is_numeric() {
             let mut v = 0;
             loop {
                 v = 10 * v + self.peek.unwrap().to_digit(10 as u32).unwrap();
                 Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
-                if !self.peek.unwrap_or(' ').is_numeric() {
+                if !self.peek.as_ref().unwrap_or(&' ').clone().is_numeric() {
                     break;
                 }
             }
@@ -301,12 +324,12 @@ impl Lexer {
             ));
         }
         // Var Token analyze
-        if self.peek.unwrap_or(' ') == '$' && self.read_next('{')? {
+        if self.peek.as_ref().unwrap_or(&' ').clone() == '$' && self.read_next('{')? {
             let mut id = String::new();
             loop {
                 Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
-                let peek_num = self.peek.unwrap_or(' ');
-                if self.peek.unwrap_or(' ').is_numeric()
+                let peek_num = self.peek.as_ref().unwrap_or(&' ').clone();
+                if self.peek.as_ref().unwrap_or(&' ').clone().is_numeric()
                     || (peek_num >= 'a' && peek_num <= 'z')
                     || (peek_num >= 'A' && peek_num <= 'Z')
                 {
@@ -326,6 +349,9 @@ impl Lexer {
                 self.peek.unwrap().to_string(),
             ));
         }
-        Ok(Other::create_with_token_and_val(TokenTag::OTHER, self.peek.unwrap()));
+        Ok(Other::create_with_token_and_val(
+            TokenTag::OTHER,
+            self.peek.unwrap(),
+        ))
     }
 }
