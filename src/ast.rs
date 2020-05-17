@@ -342,6 +342,7 @@ pub struct Parser {
 }
 
 #[allow(dead_code, non_camel_case_types)]
+#[derive(Debug)]
 pub enum AstError {
     OTHER(String),
     FORMAT_NOT_MATCH(String),
@@ -411,29 +412,32 @@ impl Parser {
                     if token.is_err() {
                         return Err(AstError::OTHER("Create num token failed!".to_string()));
                     }
-                    Num::create(token.unwrap())?;
+                    return Ok(Box::new(Num::create(token.unwrap())?));
                 }
                 TokenTag::STR => {
                     let token = TokenStr::create_with_token_and_val(TokenTag::STR, token.lexeme());
                     if token.is_err() {
                         return Err(AstError::OTHER("Create str token failed!".to_string()));
                     }
-                    Str::create(token.unwrap())?;
+                    return Ok(Box::new(Str::create(token.unwrap())?));
                 }
                 TokenTag::VAR => {
                     let token = TokenVar::create_with_token_and_val(TokenTag::VAR, token.lexeme());
                     if token.is_err() {
-                        return Err(AstError::OTHER("Create str token failed!".to_string()));
+                        return Err(AstError::OTHER("Create var token failed!".to_string()));
                     }
-                    Var::create(token.unwrap())?;
+                    return Ok(Box::new(Var::create(token.unwrap())?));
                 }
-                _ => {}
+                _ => {
+                    return Err(AstError::OTHER(
+                        "Not find available token tag to process".to_string(),
+                    ));
+                }
             },
             None => {
                 return Err(AstError::OTHER("Current token is none!".to_string()));
             }
         }
-        Err(AstError::OTHER("".to_string()))
     }
 
     fn args_add(&mut self, tag: TokenTag, s: String) -> Result<Box<dyn Expr>, AstError> {
@@ -463,10 +467,10 @@ impl Parser {
                     TokenTag::MOD => {
                         return Ok(Box::new(Mod::create(and_token, args)?));
                     }
-                    TokenTag::IN=> {
+                    TokenTag::IN => {
                         return Ok(Box::new(In::create(and_token, args)?));
                     }
-                    TokenTag::EQUALS=> {
+                    TokenTag::EQUALS => {
                         return Ok(Box::new(Equals::create(and_token, args)?));
                     }
                     _ => {
@@ -520,6 +524,29 @@ impl Parser {
                 return Err(AstError::NO_TOKEN_MATCH(
                     "There is not token is current parser status".to_string(),
                 ));
+            }
+        }
+    }
+}
+
+mod tests {
+    use super::{Parser, Value};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_simple_in() {
+        let mut kv: HashMap<String, Value> = HashMap::new();
+        kv.insert("id".to_string(), Value::INT(1));
+        let parser = Parser::create("(IN ${id} 2 3)".to_string());
+        if let Ok(mut p) = parser {
+            match p.parse() {
+                Ok(o) => {
+                    println!("execute result is: {:?}", o.eval(Arc::new(kv)));
+                }
+                Err(e) => {
+                    println!("execute error: {:?}", e);
+                }
             }
         }
     }

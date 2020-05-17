@@ -437,61 +437,61 @@ impl Lexer {
     }
 }
 
-mod tests {
-    #[allow(unused_imports)]
-    use super::*;
+// mod tests {
+//     #[allow(unused_imports)]
+//     use super::*;
 
-    #[test]
-    fn test_simple_token_split() {
-        let mut lexer =
-            Lexer::create("( 123 ${i123} IN EQUALS NOT MOD OR AND) ${123} )".to_string()).unwrap();
-        let mut tokens: Vec<Box<dyn Token>> = Vec::new();
-        loop {
-            let scan_result = lexer.scan();
-            if scan_result.is_err() {
-                break;
-            }
-            let scan_result = scan_result.unwrap();
-            println!("lexeme: {:?}", scan_result.lexeme());
-            tokens.push(scan_result);
-        }
-        println!("tokens length is:{}", tokens.len());
-        assert!(tokens.len() == 14);
-    }
+//     #[test]
+//     fn test_simple_token_split() {
+//         let mut lexer =
+//             Lexer::create("( 123 ${i123} IN EQUALS NOT MOD OR AND) ${123} )".to_string()).unwrap();
+//         let mut tokens: Vec<Box<dyn Token>> = Vec::new();
+//         loop {
+//             let scan_result = lexer.scan();
+//             if scan_result.is_err() {
+//                 break;
+//             }
+//             let scan_result = scan_result.unwrap();
+//             println!("lexeme: {:?}", scan_result.lexeme());
+//             tokens.push(scan_result);
+//         }
+//         println!("tokens length is:{}", tokens.len());
+//         assert!(tokens.len() == 14);
+//     }
 
-    #[test]
-    fn test_real_expr_token_rule_content() {
-        let mut lexer = Lexer::create("(AND (IN (MOD 12) 1) (IN 1 123 4))".to_string()).unwrap();
-        let mut tokens: Vec<Box<dyn Token>> = Vec::new();
-        loop {
-            let scan_result = lexer.scan();
-            if scan_result.is_err() {
-                break;
-            }
-            let scan_result = scan_result.unwrap();
-            println!("lexeme: {:?}", scan_result.lexeme());
-            tokens.push(scan_result);
-        }
-        println!("tokens length is:{}", tokens.len());
-        assert!(tokens.len() == 17);
-    }
+//     #[test]
+//     fn test_real_expr_token_rule_content() {
+//         let mut lexer = Lexer::create("(AND (IN (MOD 12) 1) (IN 1 123 4))".to_string()).unwrap();
+//         let mut tokens: Vec<Box<dyn Token>> = Vec::new();
+//         loop {
+//             let scan_result = lexer.scan();
+//             if scan_result.is_err() {
+//                 break;
+//             }
+//             let scan_result = scan_result.unwrap();
+//             println!("lexeme: {:?}", scan_result.lexeme());
+//             tokens.push(scan_result);
+//         }
+//         println!("tokens length is:{}", tokens.len());
+//         assert!(tokens.len() == 17);
+//     }
 
-    #[test]
-    fn test_not_use_content_expr() {
-        let mut lexer =
-            Lexer::create("asdf dsa fda sfE fdf ae 123123 2321 #${123} asdfdsf".to_string())
-                .unwrap();
-        let mut tokens: Vec<Box<dyn Token>> = Vec::new();
-        loop {
-            let scan_result = lexer.scan();
-            if scan_result.is_err() {
-                break;
-            }
-            let scan_result = scan_result.unwrap();
-            println!("lexeme: {:?}", scan_result.lexeme());
-            tokens.push(scan_result);
-        }
-        println!("tokens length is:{}", tokens.len());
-        assert!(tokens.len() == 29);
-    }
-}
+//     #[test]
+//     fn test_not_use_content_expr() {
+//         let mut lexer =
+//             Lexer::create("asdf dsa fda sfE fdf ae 123123 2321 #${123} asdfdsf".to_string())
+//                 .unwrap();
+//         let mut tokens: Vec<Box<dyn Token>> = Vec::new();
+//         loop {
+//             let scan_result = lexer.scan();
+//             if scan_result.is_err() {
+//                 break;
+//             }
+//             let scan_result = scan_result.unwrap();
+//             println!("lexeme: {:?}", scan_result.lexeme());
+//             tokens.push(scan_result);
+//         }
+//         println!("tokens length is:{}", tokens.len());
+//         assert!(tokens.len() == 29);
+//     }
+// }
