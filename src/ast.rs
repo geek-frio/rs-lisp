@@ -15,6 +15,7 @@ pub enum Value {
 pub trait Expr {
     fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError>;
 }
+
 #[allow(dead_code)]
 pub struct And {
     token: Box<dyn Token>,
@@ -154,8 +155,8 @@ pub struct In {
 
 #[allow(dead_code)]
 impl In {
-    fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<Or, AstError> {
-        Ok(Or {
+    fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<In, AstError> {
+        Ok(In {
             token: op_tag,
             args: args,
         })
@@ -174,6 +175,7 @@ impl Expr for In {
             return Ok(Value::BOOL(false));
         }
         let arg0 = arg0.unwrap().eval(ctx.clone())?;
+        // 逐个判断值之间是否相等
         for i in 1..(self.args.len() - 1) {
             let arg = self.args.get(i);
             if arg.is_some() {
@@ -205,7 +207,9 @@ impl Expr for Num {
                 return Ok(Value::INT(i));
             }
             Err(_) => {
-                return Err(AstError::EVAL_NUM_FAILED("eval number failed!".to_string()));
+                return Err(AstError::EVAL_NUM_FAILED(
+                    "eval number failed!maybe it's not a number".to_string(),
+                ));
             }
         }
     }
@@ -227,6 +231,7 @@ impl Expr for Str {
         return Ok(Value::STR(self.token.lexeme()));
     }
 }
+
 pub struct Var {
     token: Box<dyn Token>,
 }
@@ -305,7 +310,9 @@ impl Parser {
     }
 
     fn parse(&mut self) -> Result<Box<dyn Expr>, AstError> {
-        self.match_term(TokenTag::LEFT_BRACKET)?;
+        if !self.move_token()? {
+            return Err(AstError::OTHER("Has already analyzed this rule content to expr".to_string()));
+        }
         let expr = self.expr()?;
         self.match_term(TokenTag::RIGHT_BRACKET)?;
         return Ok(expr);
