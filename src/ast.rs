@@ -6,22 +6,23 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
-enum Value {
+pub enum Value {
     INT(i64),
     BOOL(bool),
     STR(String),
 }
 
-trait Expr {
+pub trait Expr {
     fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError>;
 }
-
+#[allow(dead_code)]
 pub struct And {
     token: Box<dyn Token>,
     args: Vec<Box<dyn Expr>>,
 }
 
 impl And {
+    #[allow(dead_code)]
     fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<And, AstError> {
         Ok(And {
             token: op_tag,
@@ -57,11 +58,13 @@ impl Expr for And {
     }
 }
 
+#[allow(dead_code)]
 pub struct Mod {
     token: Box<dyn Token>,
     args: Vec<Box<dyn Expr>>,
 }
 
+#[allow(dead_code)]
 impl Mod {
     fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<Mod, AstError> {
         Ok(Mod {
@@ -100,11 +103,13 @@ impl Expr for Mod {
     }
 }
 
+#[allow(dead_code)]
 pub struct Or {
     token: Box<dyn Token>,
     args: Vec<Box<dyn Expr>>,
 }
 
+#[allow(dead_code)]
 impl Or {
     fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<Or, AstError> {
         Ok(Or {
@@ -141,11 +146,13 @@ impl Expr for Or {
     }
 }
 
+#[allow(dead_code)]
 pub struct In {
     token: Box<dyn Token>,
     args: Vec<Box<dyn Expr>>,
 }
 
+#[allow(dead_code)]
 impl In {
     fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<Or, AstError> {
         Ok(Or {
@@ -184,6 +191,7 @@ pub struct Num {
     token: Box<dyn Token>,
 }
 
+#[allow(dead_code)]
 impl Num {
     fn create(op_tag: Box<dyn Token>) -> Result<Num, AstError> {
         Ok(Num { token: op_tag })
@@ -191,7 +199,7 @@ impl Num {
 }
 
 impl Expr for Num {
-    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
+    fn eval(&self, _ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         match self.token.lexeme().parse::<i64>() {
             Ok(i) => {
                 return Ok(Value::INT(i));
@@ -207,6 +215,7 @@ pub struct Str {
     token: Box<dyn Token>,
 }
 
+#[allow(dead_code)]
 impl Str {
     fn create(op_tag: Box<dyn Token>) -> Result<Str, AstError> {
         Ok(Str { token: op_tag })
@@ -214,7 +223,7 @@ impl Str {
 }
 
 impl Expr for Str {
-    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
+    fn eval(&self, _ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         return Ok(Value::STR(self.token.lexeme()));
     }
 }
@@ -222,6 +231,7 @@ pub struct Var {
     token: Box<dyn Token>,
 }
 
+#[allow(dead_code)]
 impl Var {
     fn create(op_tag: Box<dyn Token>) -> Result<Var, AstError> {
         Ok(Var { token: op_tag })
@@ -244,6 +254,7 @@ pub struct Bool {
     token: Box<dyn Token>,
 }
 
+#[allow(dead_code)]
 impl Bool {
     fn create(op_tag: Box<dyn Token>) -> Result<Bool, AstError> {
         Ok(Bool { token: op_tag })
@@ -251,7 +262,7 @@ impl Bool {
 }
 
 impl Expr for Bool {
-    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
+    fn eval(&self, _ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         if self.token.lexeme().to_lowercase() == "true" || self.token.lexeme().to_lowercase() == "1"
         {
             return Ok(Value::BOOL(true));
@@ -261,11 +272,13 @@ impl Expr for Bool {
     }
 }
 
+#[allow(dead_code)]
 pub struct Parser {
     lexer: Lexer,
     look_token: Option<Box<dyn Token>>,
 }
 
+#[allow(dead_code, non_camel_case_types)]
 pub enum AstError {
     OTHER(String),
     FORMAT_NOT_MATCH(String),
@@ -278,6 +291,7 @@ pub enum AstError {
     ARG_NOT_CORRECT(String),
 }
 
+#[allow(dead_code)]
 impl Parser {
     fn create(content: String) -> Result<Parser, AstError> {
         let lexer = Lexer::create(content);
@@ -401,6 +415,7 @@ impl Parser {
             Some(s) => {
                 if *s.token_tag() == tag {
                     self.move_token()?;
+                    return Ok(());
                 } else {
                     return Err(AstError::NOT_MATCH(
                         "Expected is not match with current".to_string(),
@@ -413,6 +428,5 @@ impl Parser {
                 ));
             }
         }
-        Err(AstError::OTHER("".to_string()))
     }
 }
