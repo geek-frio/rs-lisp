@@ -1,7 +1,11 @@
-use crate::token::{ErrCode, Lexer, Num as TokenNum, OpType, Token, TokenTag};
+use crate::token::{
+    ErrCode, Lexer, Num as TokenNum, OpType, Str as TokenStr, Token, TokenTag, Var as TokenVar,
+};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 enum Value {
     INT(i64),
     BOOL(bool),
@@ -9,7 +13,7 @@ enum Value {
 }
 
 trait Expr {
-    fn eval(&self) -> Result<Value, AstError>;
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError>;
 }
 
 pub struct And {
@@ -27,10 +31,10 @@ impl And {
 }
 
 impl Expr for And {
-    fn eval(&self) -> Result<Value, AstError> {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         let val = true;
         for arg in self.args.iter() {
-            let eval_val = arg.eval()?;
+            let eval_val = arg.eval(ctx.clone())?;
             match eval_val {
                 Value::INT(i) => {
                     if i == 0 {
@@ -53,6 +57,49 @@ impl Expr for And {
     }
 }
 
+pub struct Mod {
+    token: Box<dyn Token>,
+    args: Vec<Box<dyn Expr>>,
+}
+
+impl Mod {
+    fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<Mod, AstError> {
+        Ok(Mod {
+            token: op_tag,
+            args: args,
+        })
+    }
+}
+
+impl Expr for Mod {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
+        if self.args.len() < 2 {
+            return Err(AstError::NOT_ENOUGH_ARGS(
+                "Mod does not have enough args!".to_string(),
+            ));
+        }
+        let arg0 = self.args.get(0);
+        let arg1 = self.args.get(1);
+        if arg0.is_none() || arg1.is_none() {
+            return Err(AstError::NOT_ENOUGH_ARGS(
+                "Args in mod has noe value".to_string(),
+            ));
+        }
+        let arg0 = arg0.unwrap().eval(ctx.clone())?;
+        let arg1 = arg1.unwrap().eval(ctx.clone())?;
+
+        if let Value::INT(i1) = arg0 {
+            if let Value::INT(i2) = arg1 {
+                let result = i1 % i2;
+                return Ok(Value::INT(result));
+            }
+        }
+        return Err(AstError::ARG_NOT_CORRECT(
+            "Arg's format is not correct for mod ".to_string(),
+        ));
+    }
+}
+
 pub struct Or {
     token: Box<dyn Token>,
     args: Vec<Box<dyn Expr>>,
@@ -68,10 +115,10 @@ impl Or {
 }
 
 impl Expr for Or {
-    fn eval(&self) -> Result<Value, AstError> {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         let val = false;
         for arg in self.args.iter() {
-            let eval_val = arg.eval()?;
+            let eval_val = arg.eval(ctx.clone())?;
             match eval_val {
                 Value::INT(i) => {
                     if i == 1 {
@@ -94,7 +141,7 @@ impl Expr for Or {
     }
 }
 
-pub struct In{
+pub struct In {
     token: Box<dyn Token>,
     args: Vec<Box<dyn Expr>>,
 }
@@ -108,15 +155,30 @@ impl In {
     }
 }
 
-impl Expr for In{
-    fn eval(&self) -> Result<Value, AstError> {
-        //TODO
+impl Expr for In {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         if self.args.len() <= 1 {
-            return Err(AstError::);
+            return Err(AstError::NOT_ENOUGH_ARGS(
+                "In operator should have at least two arguments".to_string(),
+            ));
         }
+        let arg0 = self.args.get(0);
+        if arg0.is_none() {
+            return Ok(Value::BOOL(false));
+        }
+        let arg0 = arg0.unwrap().eval(ctx.clone())?;
+        for i in 1..(self.args.len() - 1) {
+            let arg = self.args.get(i);
+            if arg.is_some() {
+                let arg = arg.unwrap().eval(ctx.clone())?;
+                if arg0 == arg {
+                    return Ok(Value::BOOL(true));
+                }
+            }
+        }
+        return Ok(Value::BOOL(false));
     }
 }
-
 
 pub struct Num {
     token: Box<dyn Token>,
@@ -129,7 +191,7 @@ impl Num {
 }
 
 impl Expr for Num {
-    fn eval(&self) -> Result<Value, AstError> {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         match self.token.lexeme().parse::<i64>() {
             Ok(i) => {
                 return Ok(Value::INT(i));
@@ -152,8 +214,29 @@ impl Str {
 }
 
 impl Expr for Str {
-    fn eval(&self) -> Result<Value, AstError> {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         return Ok(Value::STR(self.token.lexeme()));
+    }
+}
+pub struct Var {
+    token: Box<dyn Token>,
+}
+
+impl Var {
+    fn create(op_tag: Box<dyn Token>) -> Result<Var, AstError> {
+        Ok(Var { token: op_tag })
+    }
+}
+
+impl Expr for Var {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
+        let key = self.token.lexeme();
+        let val = ctx.get(&key);
+        if val.is_none() {
+            return Ok(Value::BOOL(false));
+        } else {
+            return Ok(val.unwrap().clone());
+        }
     }
 }
 
@@ -168,7 +251,7 @@ impl Bool {
 }
 
 impl Expr for Bool {
-    fn eval(&self) -> Result<Value, AstError> {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
         if self.token.lexeme().to_lowercase() == "true" || self.token.lexeme().to_lowercase() == "1"
         {
             return Ok(Value::BOOL(true));
@@ -192,6 +275,7 @@ pub enum AstError {
     NOT_SUPP_OPER(String),
     EVAL_NUM_FAILED(String),
     NOT_ENOUGH_ARGS(String),
+    ARG_NOT_CORRECT(String),
 }
 
 impl Parser {
@@ -240,8 +324,20 @@ impl Parser {
                     }
                     Num::create(token.unwrap())?;
                 }
-                TokenTag::STR => {}
-                TokenTag::VAR => {}
+                TokenTag::STR => {
+                    let token = TokenStr::create_with_token_and_val(TokenTag::STR, token.lexeme());
+                    if token.is_err() {
+                        return Err(AstError::OTHER("Create str token failed!".to_string()));
+                    }
+                    Str::create(token.unwrap())?;
+                }
+                TokenTag::VAR => {
+                    let token = TokenVar::create_with_token_and_val(TokenTag::VAR, token.lexeme());
+                    if token.is_err() {
+                        return Err(AstError::OTHER("Create str token failed!".to_string()));
+                    }
+                    Var::create(token.unwrap())?;
+                }
                 _ => {}
             },
             None => {
