@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-#[allow(dead_code)]
-#[derive(Debug)]
+#[allow(dead_code, non_camel_case_types)]
+#[derive(Debug, PartialEq)]
 pub enum TokenTag {
     AND,
     OR,
@@ -11,6 +11,9 @@ pub enum TokenTag {
     VAR,
     OTHER,
     NUM,
+    LEFT_BRACKET,
+    RIGHT_BRACKET,
+    STR,
 }
 
 #[derive(Debug)]
@@ -32,19 +35,22 @@ impl TokenTag {
             TokenTag::VAR => 261,
             TokenTag::OTHER => 262,
             TokenTag::NUM => 263,
+            TokenTag::LEFT_BRACKET => 264,
+            TokenTag::RIGHT_BRACKET => 265,
+            TokenTag::STR => 266,
         }
     }
 }
 
-trait Token {
+pub trait Token {
     fn token_tag(&self) -> &TokenTag;
     fn lexeme(&self) -> String;
 }
 
 #[derive(Debug)]
-struct OpType {
-    tag: TokenTag,
-    lexeme: String,
+pub struct OpType {
+    pub tag: TokenTag,
+    pub lexeme: String,
 }
 
 impl OpType {
@@ -67,14 +73,14 @@ impl Token for OpType {
 }
 
 #[derive(Debug)]
-struct Var {
+pub struct Var {
     s: String,
     token_tag: TokenTag,
 }
 
 impl Var {
     #[allow(dead_code)]
-    fn create_with_token_and_val(
+    pub fn create_with_token_and_val(
         token_tag: TokenTag,
         s: String,
     ) -> Result<Box<dyn Token>, ErrCode> {
@@ -96,14 +102,14 @@ impl Token for Var {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-struct Num {
+pub struct Num {
     token_tag: TokenTag,
     val: i64,
     lexeme: String,
 }
 impl Num {
     #[allow(dead_code)]
-    fn create_with_token_and_val(
+    pub fn create_with_token_and_val(
         token_tag: TokenTag,
         lexeme: String,
     ) -> Result<Box<dyn Token>, ErrCode> {
@@ -130,14 +136,14 @@ impl Token for Num {
 }
 
 #[derive(Debug)]
-struct Str {
+pub struct Str {
     token_tag: TokenTag,
     s: String,
 }
 
 impl Str {
     #[allow(dead_code)]
-    fn create_with_token_and_val(
+    pub fn create_with_token_and_val(
         token_tag: TokenTag,
         s: String,
     ) -> Result<Box<dyn Token>, ErrCode> {
@@ -182,19 +188,7 @@ impl Token for Other {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
-enum Value {
-    INT(i64),
-    BOOL(bool),
-    STR(String),
-}
-
-trait Expr {
-    fn eval(&self) -> Box<Value>;
-}
-
-#[allow(dead_code)]
-struct Lexer {
+pub struct Lexer {
     reserved: HashMap<String, Arc<Box<dyn Token>>>,
     rule_content: String,
     chars: Vec<char>,
@@ -204,7 +198,7 @@ struct Lexer {
 
 impl Lexer {
     #[allow(dead_code)]
-    fn create(content: String) -> Result<Lexer, ErrCode> {
+    pub fn create(content: String) -> Result<Lexer, ErrCode> {
         let mut reserved: HashMap<String, Arc<Box<dyn Token>>> = HashMap::new();
         let and_ops = OpType::create_with_token(TokenTag::AND, "AND".to_string())?;
         let or_ops = OpType::create_with_token(TokenTag::OR, "OR".to_string())?;
@@ -298,10 +292,22 @@ impl Lexer {
     }
 
     #[allow(dead_code)]
-    fn scan(&mut self) -> Result<Box<dyn Token>, ErrCode> {
+    pub fn scan(&mut self) -> Result<Box<dyn Token>, ErrCode> {
         Self::skip_blank_and_read(&mut self.cur_step, &mut self.peek, &self.chars)?;
         // 操作符Token匹配
         match self.peek {
+            Some('(') => {
+                return Ok(Other::create_with_token_and_val(
+                    TokenTag::LEFT_BRACKET,
+                    self.peek.as_ref().unwrap_or(&' ').clone(),
+                )?);
+            }
+            Some(')') => {
+                return Ok(Other::create_with_token_and_val(
+                    TokenTag::RIGHT_BRACKET,
+                    self.peek.as_ref().unwrap_or(&' ').clone(),
+                )?);
+            }
             Some('I') => {
                 let ori_step = self.cur_step.clone();
                 if self.read_next('N')? {
@@ -368,6 +374,20 @@ impl Lexer {
                         TokenTag::OTHER,
                         self.peek.as_ref().unwrap_or(&' ').clone(),
                     )?);
+                }
+            }
+            Some('"') => {
+                let mut s = String::new();
+                loop {
+                    Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
+                    let cur_peek = self.peek.as_ref().unwrap_or(&' ').clone();
+                    if cur_peek == '"' {
+                        return Ok(OpType::create_with_token(
+                            TokenTag::STR,
+                            s,
+                        )?);
+                    }
+                    s.push(cur_peek);
                 }
             }
             _ => {}
@@ -458,7 +478,9 @@ mod tests {
 
     #[test]
     fn test_not_use_content_expr() {
-        let mut lexer = Lexer::create("asdf dsa fda sfE fdf ae 123123 2321 #${123} asdfdsf".to_string()).unwrap();
+        let mut lexer =
+            Lexer::create("asdf dsa fda sfE fdf ae 123123 2321 #${123} asdfdsf".to_string())
+                .unwrap();
         let mut tokens: Vec<Box<dyn Token>> = Vec::new();
         loop {
             let scan_result = lexer.scan();
