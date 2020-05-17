@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 #[allow(dead_code, non_camel_case_types)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq,Clone)]
 pub enum TokenTag {
     AND,
     OR,

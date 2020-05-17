@@ -189,6 +189,64 @@ impl Expr for In {
     }
 }
 
+#[allow(dead_code)]
+pub struct Equals {
+    token: Box<dyn Token>,
+    args: Vec<Box<dyn Expr>>,
+}
+
+#[allow(dead_code)]
+impl Equals {
+    fn create(op_tag: Box<dyn Token>, args: Vec<Box<dyn Expr>>) -> Result<Equals, AstError> {
+        Ok(Equals {
+            token: op_tag,
+            args: args,
+        })
+    }
+}
+
+impl Expr for Equals {
+    fn eval(&self, ctx: Arc<HashMap<String, Value>>) -> Result<Value, AstError> {
+        // if self.args.len() <= 1 {
+        //     return Err(AstError::NOT_ENOUGH_ARGS(
+        //         "In operator should have at least two arguments".to_string(),
+        //     ));
+        // }
+        // let arg0 = self.args.get(0);
+        // if arg0.is_none() {
+        //     return Ok(Value::BOOL(false));
+        // }
+        // let arg0 = arg0.unwrap().eval(ctx.clone())?;
+        // // 逐个判断值之间是否相等
+        // for i in 1..(self.args.len() - 1) {
+        //     let arg = self.args.get(i);
+        //     if arg.is_some() {
+        //         let arg = arg.unwrap().eval(ctx.clone())?;
+        //         if arg0 == arg {
+        //             return Ok(Value::BOOL(true));
+        //         }
+        //     }
+        // }
+        // return Ok(Value::BOOL(false));
+        if self.args.len() < 2 {
+            return Err(AstError::NOT_ENOUGH_ARGS(
+                "Mod does not have enough args!".to_string(),
+            ));
+        }
+        let arg0 = self.args.get(0);
+        let arg1 = self.args.get(1);
+        if arg0.is_none() || arg1.is_none() {
+            return Err(AstError::NOT_ENOUGH_ARGS(
+                "Args in mod has noe value".to_string(),
+            ));
+        }
+        let arg0 = arg0.unwrap().eval(ctx.clone())?;
+        let arg1 = arg1.unwrap().eval(ctx.clone())?;
+
+        return Ok(Value::BOOL(arg0 == arg1));
+    }
+}
+
 pub struct Num {
     token: Box<dyn Token>,
 }
@@ -311,7 +369,9 @@ impl Parser {
 
     fn parse(&mut self) -> Result<Box<dyn Expr>, AstError> {
         if !self.move_token()? {
-            return Err(AstError::OTHER("Has already analyzed this rule content to expr".to_string()));
+            return Err(AstError::OTHER(
+                "Has already analyzed this rule content to expr".to_string(),
+            ));
         }
         let expr = self.expr()?;
         self.match_term(TokenTag::RIGHT_BRACKET)?;
@@ -324,12 +384,20 @@ impl Parser {
                 TokenTag::LEFT_BRACKET => {
                     self.move_token()?;
                     match self.look_token.as_ref().unwrap().token_tag() {
-                        TokenTag::AND
-                        | TokenTag::OR
-                        | TokenTag::MOD
-                        | TokenTag::EQUALS
-                        | TokenTag::IN => {
-                            return Ok(self.args_add()?);
+                        TokenTag::AND => {
+                            return Ok(self.args_add(TokenTag::AND, "AND".to_string())?);
+                        }
+                        TokenTag::OR => {
+                            return Ok(self.args_add(TokenTag::OR, "OR".to_string())?);
+                        }
+                        TokenTag::MOD => {
+                            return Ok(self.args_add(TokenTag::MOD, "MOD".to_string())?);
+                        }
+                        TokenTag::EQUALS => {
+                            return Ok(self.args_add(TokenTag::EQUALS, "EQUALS".to_string())?);
+                        }
+                        TokenTag::IN => {
+                            return Ok(self.args_add(TokenTag::IN, "IN".to_string())?);
                         }
                         _ => {
                             return Err(AstError::NOT_SUPP_OPER(
@@ -368,7 +436,7 @@ impl Parser {
         Err(AstError::OTHER("".to_string()))
     }
 
-    fn args_add(&mut self) -> Result<Box<dyn Expr>, AstError> {
+    fn args_add(&mut self, tag: TokenTag, s: String) -> Result<Box<dyn Expr>, AstError> {
         let mut args: Vec<Box<dyn Expr>> = Vec::new();
         for _ in 0..10000 {
             if !self.move_token()? {
@@ -382,10 +450,29 @@ impl Parser {
             {
                 self.move_token()?;
                 let and_token = Box::new(OpType {
-                    tag: TokenTag::AND,
-                    lexeme: "and".to_string(),
+                    tag: tag.clone(),
+                    lexeme: s,
                 });
-                return Ok(Box::new(And::create(and_token, args)?));
+                match tag {
+                    TokenTag::AND => {
+                        return Ok(Box::new(And::create(and_token, args)?));
+                    }
+                    TokenTag::OR => {
+                        return Ok(Box::new(Or::create(and_token, args)?));
+                    }
+                    TokenTag::MOD => {
+                        return Ok(Box::new(Mod::create(and_token, args)?));
+                    }
+                    TokenTag::IN=> {
+                        return Ok(Box::new(In::create(and_token, args)?));
+                    }
+                    TokenTag::EQUALS=> {
+                        return Ok(Box::new(Equals::create(and_token, args)?));
+                    }
+                    _ => {
+                        return Err(AstError::NOT_SUPP_OPER("not supported opt".to_string()));
+                    }
+                }
             }
             args.push(self.expr()?);
         }
