@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum TokenTag {
     AND,
     OR,
@@ -10,6 +11,13 @@ pub enum TokenTag {
     VAR,
     OTHER,
     NUM,
+}
+
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub enum ErrCode {
+    READ_TO_END(String),
+    OTHER(String),
 }
 
 impl TokenTag {
@@ -33,6 +41,7 @@ trait Token {
     fn lexeme(&self) -> String;
 }
 
+#[derive(Debug)]
 struct OpType {
     tag: TokenTag,
     lexeme: String,
@@ -40,11 +49,11 @@ struct OpType {
 
 impl OpType {
     #[allow(dead_code)]
-    fn create_with_token(token_tag: TokenTag, lexeme: String) -> Box<dyn Token> {
-        Box::new(OpType {
+    fn create_with_token(token_tag: TokenTag, lexeme: String) -> Result<Box<dyn Token>, ErrCode> {
+        Ok(Box::new(OpType {
             tag: token_tag,
             lexeme: lexeme,
-        })
+        }))
     }
 }
 
@@ -57,6 +66,7 @@ impl Token for OpType {
     }
 }
 
+#[derive(Debug)]
 struct Var {
     s: String,
     token_tag: TokenTag,
@@ -64,11 +74,14 @@ struct Var {
 
 impl Var {
     #[allow(dead_code)]
-    fn create_with_token_and_val(token_tag: TokenTag, s: String) -> Box<dyn Token> {
-        Box::new(Var {
+    fn create_with_token_and_val(
+        token_tag: TokenTag,
+        s: String,
+    ) -> Result<Box<dyn Token>, ErrCode> {
+        Ok(Box::new(Var {
             s: s,
             token_tag: token_tag,
-        })
+        }))
     }
 }
 
@@ -82,6 +95,7 @@ impl Token for Var {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 struct Num {
     token_tag: TokenTag,
     val: i64,
@@ -89,12 +103,19 @@ struct Num {
 }
 impl Num {
     #[allow(dead_code)]
-    fn create_with_token_and_val(token_tag: TokenTag, lexeme: String) -> Box<dyn Token> {
-        Box::new(Num {
+    fn create_with_token_and_val(
+        token_tag: TokenTag,
+        lexeme: String,
+    ) -> Result<Box<dyn Token>, ErrCode> {
+        if !lexeme.parse::<i64>().is_ok() {
+            println!("lexeme is {}", lexeme);
+            return Err(ErrCode::OTHER("Not a number lexeme".to_string()));
+        }
+        Ok(Box::new(Num {
             token_tag: token_tag,
-            val: lexeme.parse::<i64>().map_or_else(|_e| -1 as i64, |v| v),
+            val: lexeme.parse::<i64>().unwrap(),
             lexeme: lexeme,
-        })
+        }))
     }
 }
 
@@ -108,6 +129,7 @@ impl Token for Num {
     }
 }
 
+#[derive(Debug)]
 struct Str {
     token_tag: TokenTag,
     s: String,
@@ -115,11 +137,14 @@ struct Str {
 
 impl Str {
     #[allow(dead_code)]
-    fn create_with_token_and_val(token_tag: TokenTag, s: String) -> Box<dyn Token> {
-        Box::new(Str {
+    fn create_with_token_and_val(
+        token_tag: TokenTag,
+        s: String,
+    ) -> Result<Box<dyn Token>, ErrCode> {
+        Ok(Box::new(Str {
             token_tag: token_tag,
             s: s,
-        })
+        }))
     }
 }
 
@@ -132,6 +157,7 @@ impl Token for Str {
     }
 }
 
+#[derive(Debug)]
 struct Other {
     token_tag: TokenTag,
     lexeme: String,
@@ -139,11 +165,11 @@ struct Other {
 
 impl Other {
     #[allow(dead_code)]
-    fn create_with_token_and_val(token_tag: TokenTag, s: char) -> Box<dyn Token> {
-        Box::new(Other {
+    fn create_with_token_and_val(token_tag: TokenTag, s: char) -> Result<Box<dyn Token>, ErrCode> {
+        Ok(Box::new(Other {
             token_tag: token_tag,
             lexeme: s.to_string(),
-        })
+        }))
     }
 }
 impl Token for Other {
@@ -156,6 +182,7 @@ impl Token for Other {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 enum Value {
     INT(i64),
     BOOL(bool),
@@ -177,44 +204,67 @@ struct Lexer {
 
 impl Lexer {
     #[allow(dead_code)]
-    fn create(content: String) -> Lexer {
+    fn create(content: String) -> Result<Lexer, ErrCode> {
         let mut reserved: HashMap<String, Arc<Box<dyn Token>>> = HashMap::new();
-        let and_ops = OpType::create_with_token(TokenTag::AND, "AND".to_string());
-        let or_ops = OpType::create_with_token(TokenTag::OR, "OR".to_string());
-        let mod_ops = OpType::create_with_token(TokenTag::MOD, "MOD".to_string());
-        let in_ops = OpType::create_with_token(TokenTag::IN, "IN".to_string());
-        let eq_ops = OpType::create_with_token(TokenTag::EQUALS, "EQUAL".to_string());
+        let and_ops = OpType::create_with_token(TokenTag::AND, "AND".to_string())?;
+        let or_ops = OpType::create_with_token(TokenTag::OR, "OR".to_string())?;
+        let mod_ops = OpType::create_with_token(TokenTag::MOD, "MOD".to_string())?;
+        let in_ops = OpType::create_with_token(TokenTag::IN, "IN".to_string())?;
+        let eq_ops = OpType::create_with_token(TokenTag::EQUALS, "EQUAL".to_string())?;
         reserved.insert(and_ops.lexeme(), Arc::new(and_ops));
         reserved.insert(or_ops.lexeme(), Arc::new(or_ops));
         reserved.insert(mod_ops.lexeme(), Arc::new(mod_ops));
         reserved.insert(in_ops.lexeme(), Arc::new(in_ops));
         reserved.insert(eq_ops.lexeme(), Arc::new(eq_ops));
         let chars: Vec<char> = content.chars().collect();
-        Lexer {
+        Ok(Lexer {
             reserved: reserved,
             rule_content: content,
             cur_step: -1,
             peek: None,
             chars: chars,
-        }
+        })
     }
 
     #[allow(dead_code)]
-    fn read(step: &mut i32, peek: &mut Option<char>, c: &Vec<char>) -> Result<(), String> {
+    fn read(step: &mut i32, peek: &mut Option<char>, c: &Vec<char>) -> Result<(), ErrCode> {
         *step += 1;
         match c.get(*step as usize) {
             Some(i) => {
                 peek.replace(i.clone());
             }
             None => {
-                return Err("Has read to the end".to_string());
+                return Err(ErrCode::READ_TO_END("Has read to the end".to_string()));
+            }
+        }
+        Ok(())
+    }
+    #[allow(dead_code)]
+    fn back_read(
+        step: &mut i32,
+        peek: &mut Option<char>,
+        c: &Vec<char>,
+        ori_step: i32,
+    ) -> Result<(), ErrCode> {
+        loop {
+            if *step == ori_step {
+                break;
+            }
+            *step -= 1;
+            match c.get(*step as usize) {
+                Some(i) => {
+                    peek.replace(i.clone());
+                }
+                None => {
+                    return Err(ErrCode::OTHER("Back failed!".to_string()));
+                }
             }
         }
         Ok(())
     }
 
     #[allow(dead_code)]
-    fn read_next(&mut self, c: char) -> Result<bool, String> {
+    fn read_next(&mut self, c: char) -> Result<bool, ErrCode> {
         Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
         // when return true, will go to next char
         // so set this char to ' '
@@ -234,7 +284,7 @@ impl Lexer {
         step: &mut i32,
         peek: &mut Option<char>,
         chars: &Vec<char>,
-    ) -> Result<(), String> {
+    ) -> Result<(), ErrCode> {
         loop {
             Self::read(step, peek, chars)?;
             let peek = peek.as_ref().unwrap_or(&' ').clone();
@@ -248,62 +298,76 @@ impl Lexer {
     }
 
     #[allow(dead_code)]
-    fn scan(&mut self) -> Result<Box<dyn Token>, String> {
+    fn scan(&mut self) -> Result<Box<dyn Token>, ErrCode> {
         Self::skip_blank_and_read(&mut self.cur_step, &mut self.peek, &self.chars)?;
         // 操作符Token匹配
         match self.peek {
             Some('I') => {
+                let ori_step = self.cur_step.clone();
                 if self.read_next('N')? {
-                    return Ok(OpType::create_with_token(TokenTag::IN, "IN".to_string()));
+                    return Ok(OpType::create_with_token(TokenTag::IN, "IN".to_string())?);
                 } else {
+                    Self::back_read(&mut self.cur_step, &mut self.peek, &self.chars, ori_step)?;
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
                         self.peek.as_ref().unwrap_or(&' ').clone(),
-                    ));
+                    )?);
                 }
             }
             Some('M') => {
+                let ori_step = self.cur_step.clone();
                 if self.read_next('O')? && self.read_next('D')? {
-                    return Ok(OpType::create_with_token(TokenTag::MOD, "MOD".to_string()));
+                    return Ok(OpType::create_with_token(TokenTag::MOD, "MOD".to_string())?);
                 } else {
+                    Self::back_read(&mut self.cur_step, &mut self.peek, &self.chars, ori_step)?;
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
                         self.peek.as_ref().unwrap_or(&' ').clone(),
-                    ));
+                    )?);
                 }
             }
             Some('A') => {
+                let ori_step = self.cur_step.clone();
                 if self.read_next('N')? && self.read_next('D')? {
-                    return Ok(OpType::create_with_token(TokenTag::MOD, "AND".to_string()));
+                    return Ok(OpType::create_with_token(TokenTag::AND, "AND".to_string())?);
                 } else {
+                    Self::back_read(&mut self.cur_step, &mut self.peek, &self.chars, ori_step)?;
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
                         self.peek.as_ref().unwrap_or(&' ').clone(),
-                    ));
+                    )?);
                 }
             }
             Some('O') => {
+                let ori_step = self.cur_step.clone();
                 if self.read_next('R')? {
-                    return Ok(OpType::create_with_token(TokenTag::IN, "OR".to_string()));
+                    return Ok(OpType::create_with_token(TokenTag::OR, "OR".to_string())?);
                 } else {
+                    Self::back_read(&mut self.cur_step, &mut self.peek, &self.chars, ori_step)?;
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
                         self.peek.as_ref().unwrap_or(&' ').clone(),
-                    ));
+                    )?);
                 }
             }
             Some('E') => {
+                let ori_step = self.cur_step.clone();
                 if self.read_next('Q')?
                     && self.read_next('U')?
                     && self.read_next('A')?
                     && self.read_next('L')?
+                    && self.read_next('S')?
                 {
-                    return Ok(OpType::create_with_token(TokenTag::MOD, "AND".to_string()));
+                    return Ok(OpType::create_with_token(
+                        TokenTag::EQUALS,
+                        "EQUALS".to_string(),
+                    )?);
                 } else {
+                    Self::back_read(&mut self.cur_step, &mut self.peek, &self.chars, ori_step)?;
                     return Ok(Other::create_with_token_and_val(
                         TokenTag::OTHER,
                         self.peek.as_ref().unwrap_or(&' ').clone(),
-                    ));
+                    )?);
                 }
             }
             _ => {}
@@ -313,15 +377,17 @@ impl Lexer {
             let mut v = 0;
             loop {
                 v = 10 * v + self.peek.unwrap().to_digit(10 as u32).unwrap();
+                let ori_step = self.cur_step.clone();
                 Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
                 if !self.peek.as_ref().unwrap_or(&' ').clone().is_numeric() {
+                    Self::back_read(&mut self.cur_step, &mut self.peek, &self.chars, ori_step)?;
                     break;
                 }
             }
             return Ok(Num::create_with_token_and_val(
                 TokenTag::NUM,
-                self.peek.unwrap().to_string(),
-            ));
+                v.to_string(),
+            )?);
         }
         // Var Token analyze
         if self.peek.as_ref().unwrap_or(&' ').clone() == '$' && self.read_next('{')? {
@@ -329,29 +395,81 @@ impl Lexer {
             loop {
                 Self::read(&mut self.cur_step, &mut self.peek, &self.chars)?;
                 let peek_num = self.peek.as_ref().unwrap_or(&' ').clone();
-                if self.peek.as_ref().unwrap_or(&' ').clone().is_numeric()
+                if peek_num.is_numeric()
                     || (peek_num >= 'a' && peek_num <= 'z')
                     || (peek_num >= 'A' && peek_num <= 'Z')
                 {
                     id.push(peek_num);
-                    break;
                 } else if peek_num == '}' {
-                    return Ok(Var::create_with_token_and_val(TokenTag::VAR, id));
+                    return Ok(Var::create_with_token_and_val(TokenTag::VAR, id)?);
                 } else {
-                    return Err(format!(
+                    return Err(ErrCode::OTHER(format!(
                             "Illegal arg format for id, id should only contains a-zA-Z0-9, char index:{}",
                             self.cur_step
-                        ));
+                        )));
                 }
             }
-            return Ok(Num::create_with_token_and_val(
-                TokenTag::NUM,
-                self.peek.unwrap().to_string(),
-            ));
         }
         Ok(Other::create_with_token_and_val(
             TokenTag::OTHER,
             self.peek.unwrap(),
-        ))
+        )?)
+    }
+}
+
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn test_simple_token_split() {
+        let mut lexer =
+            Lexer::create("( 123 ${i123} IN EQUALS NOT MOD OR AND) ${123} )".to_string()).unwrap();
+        let mut tokens: Vec<Box<dyn Token>> = Vec::new();
+        loop {
+            let scan_result = lexer.scan();
+            if scan_result.is_err() {
+                break;
+            }
+            let scan_result = scan_result.unwrap();
+            println!("lexeme: {:?}", scan_result.lexeme());
+            tokens.push(scan_result);
+        }
+        println!("tokens length is:{}", tokens.len());
+        assert!(tokens.len() == 14);
+    }
+
+    #[test]
+    fn test_real_expr_token_rule_content() {
+        let mut lexer = Lexer::create("(AND (IN (MOD 12) 1) (IN 1 123 4))".to_string()).unwrap();
+        let mut tokens: Vec<Box<dyn Token>> = Vec::new();
+        loop {
+            let scan_result = lexer.scan();
+            if scan_result.is_err() {
+                break;
+            }
+            let scan_result = scan_result.unwrap();
+            println!("lexeme: {:?}", scan_result.lexeme());
+            tokens.push(scan_result);
+        }
+        println!("tokens length is:{}", tokens.len());
+        assert!(tokens.len() == 17);
+    }
+
+    #[test]
+    fn test_not_use_content_expr() {
+        let mut lexer = Lexer::create("asdf dsa fda sfE fdf ae 123123 2321 #${123} asdfdsf".to_string()).unwrap();
+        let mut tokens: Vec<Box<dyn Token>> = Vec::new();
+        loop {
+            let scan_result = lexer.scan();
+            if scan_result.is_err() {
+                break;
+            }
+            let scan_result = scan_result.unwrap();
+            println!("lexeme: {:?}", scan_result.lexeme());
+            tokens.push(scan_result);
+        }
+        println!("tokens length is:{}", tokens.len());
+        assert!(tokens.len() == 29);
     }
 }
