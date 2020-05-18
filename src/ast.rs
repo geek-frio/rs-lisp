@@ -176,7 +176,7 @@ impl Expr for In {
         }
         let arg0 = arg0.unwrap().eval(ctx.clone())?;
         // 逐个判断值之间是否相等
-        for i in 1..(self.args.len() - 1) {
+        for i in 1..self.args.len() {
             let arg = self.args.get(i);
             if arg.is_some() {
                 let arg = arg.unwrap().eval(ctx.clone())?;
@@ -386,7 +386,12 @@ impl Parser {
                     self.move_token()?;
                     match self.look_token.as_ref().unwrap().token_tag() {
                         TokenTag::AND => {
-                            return Ok(self.args_add(TokenTag::AND, "AND".to_string())?);
+                            let a = self.args_add(TokenTag::AND, "AND".to_string())?;
+                            println!(
+                                "current token is:{}",
+                                self.look_token.as_ref().unwrap().lexeme()
+                            );
+                            return Ok(a);
                         }
                         TokenTag::OR => {
                             return Ok(self.args_add(TokenTag::OR, "OR".to_string())?);
@@ -398,7 +403,12 @@ impl Parser {
                             return Ok(self.args_add(TokenTag::EQUALS, "EQUALS".to_string())?);
                         }
                         TokenTag::IN => {
-                            return Ok(self.args_add(TokenTag::IN, "IN".to_string())?);
+                            let a = self.args_add(TokenTag::IN, "IN".to_string())?;
+                            println!(
+                                "in current token is:{}",
+                                self.look_token.as_ref().unwrap().lexeme()
+                            );
+                            return Ok(a);
                         }
                         _ => {
                             return Err(AstError::NOT_SUPP_OPER(
@@ -424,11 +434,13 @@ impl Parser {
                 TokenTag::VAR => {
                     let token = TokenVar::create_with_token_and_val(TokenTag::VAR, token.lexeme());
                     if token.is_err() {
+                        println!("Var token create failed");
                         return Err(AstError::OTHER("Create var token failed!".to_string()));
                     }
                     return Ok(Box::new(Var::create(token.unwrap())?));
                 }
                 _ => {
+                    println!("Not correct token is {:?}", token.lexeme());
                     return Err(AstError::OTHER(
                         "Not find available token tag to process".to_string(),
                     ));
@@ -452,7 +464,6 @@ impl Parser {
             if self.look_token.is_some()
                 && *self.look_token.as_ref().unwrap().token_tag() == TokenTag::RIGHT_BRACKET
             {
-                self.move_token()?;
                 let and_token = Box::new(OpType {
                     tag: tag.clone(),
                     lexeme: s,
@@ -468,6 +479,7 @@ impl Parser {
                         return Ok(Box::new(Mod::create(and_token, args)?));
                     }
                     TokenTag::IN => {
+                        println!("match tag in");
                         return Ok(Box::new(In::create(and_token, args)?));
                     }
                     TokenTag::EQUALS => {
@@ -534,11 +546,28 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    #[test]
+    // #[test]
     fn test_simple_in() {
         let mut kv: HashMap<String, Value> = HashMap::new();
         kv.insert("id".to_string(), Value::INT(1));
         let parser = Parser::create("(IN ${id} 2 3)".to_string());
+        if let Ok(mut p) = parser {
+            match p.parse() {
+                Ok(o) => {
+                    println!("execute result is: {:?}", o.eval(Arc::new(kv)));
+                }
+                Err(e) => {
+                    println!("execute error: {:?}", e);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_simple_and() {
+        let mut kv: HashMap<String, Value> = HashMap::new();
+        kv.insert("id".to_string(), Value::INT(1));
+        let parser = Parser::create("(AND (IN ${id} 1) (AND (IN 1 1) 1) (IN 2 2))".to_string());
         if let Ok(mut p) = parser {
             match p.parse() {
                 Ok(o) => {
